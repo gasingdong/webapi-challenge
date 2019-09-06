@@ -119,6 +119,17 @@ router
     }
   });
 
+router.get('/:id/actions', validateProjectId, async (req, res, next) => {
+  const { project } = req;
+  const { id } = project;
+  try {
+    const actions = await Projects.getProjectActions(id);
+    res.status(200).json(actions);
+  } catch (err) {
+    next(err);
+  }
+});
+
 const projectErrorHandler = (err, req, res, next) => {
   if (res.headersSent) {
     next(err);
