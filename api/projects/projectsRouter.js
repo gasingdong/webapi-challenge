@@ -5,6 +5,27 @@ const router = express.Router();
 
 router.use(express.json());
 
+const validateProjectId = async (req, res, next) => {
+  const id = Number(req.params.id);
+
+  if (Number.isNaN(id) || !Number.isFinite(id)) {
+    res.status(400).json({ error: 'The id is not a valid number.' });
+  } else {
+    try {
+      const project = await Projects.get(id);
+
+      if (project) {
+        req.project = project;
+        next();
+      } else {
+        res.status(404).json({ error: 'There is no project with that id.' });
+      }
+    } catch (err) {
+      next(err);
+    }
+  }
+};
+
 const validateProject = (req, res, next) => {
   if (!req.body) {
     res.status(400).json({ error: 'Request body is empty.' });
@@ -15,7 +36,7 @@ const validateProject = (req, res, next) => {
 
   if (name && description) {
     try {
-      req.project = {
+      req.newProject = {
         name,
         description,
         completed: completed || false,
@@ -43,9 +64,56 @@ router
   })
   .post(validateProject, async (req, res, next) => {
     try {
-      const { project } = req;
-      const response = await Projects.insert(project);
-      res.status(200).json(response);
+      const { newProject } = req;
+      const project = await Projects.insert(newProject);
+      res.status(200).json(project);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+router
+  .route('/:id')
+  .all(validateProjectId)
+  .get((req, res) => {
+    const { project } = req;
+    res.status(200).json(project);
+  })
+  .delete(async (req, res, next) => {
+    const { project } = req;
+    const { id } = project;
+    try {
+      const deleted = await Projects.remove(id);
+
+      if (deleted) {
+        res.status(200).json(project);
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      next(err);
+    }
+  })
+  .put(async (req, res, next) => {
+    const { project } = req;
+    const { id } = project;
+    const { name, description, completed } = req.body;
+    const updatedProject = {
+      name: name || project.name,
+      description: description || project.description,
+      completed: completed || project.completed,
+    };
+    try {
+      const updated = await Projects.update(id, updatedProject);
+
+      if (updated) {
+        res.status(200).json({
+          ...updatedProject,
+          id,
+        });
+      } else {
+        throw new Error();
+      }
     } catch (err) {
       next(err);
     }
