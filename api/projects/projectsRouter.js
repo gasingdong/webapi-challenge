@@ -1,5 +1,6 @@
 const express = require('express');
 const Projects = require('../../data/helpers/projectModel');
+const Actions = require('../../data/helpers/actionModel');
 
 const router = express.Router();
 
@@ -49,6 +50,36 @@ const validateProject = (req, res, next) => {
     res
       .status(400)
       .json({ error: 'All projects require a name and a description.' });
+  }
+};
+
+const validateAction = (req, res, next) => {
+  if (!req.body) {
+    res.status(400).json({ error: 'Request body is empty.' });
+    return;
+  }
+
+  // eslint-disable-next-line camelcase
+  const { notes, description, completed } = req.body;
+  const { id } = req.params;
+
+  // eslint-disable-next-line camelcase
+  if (notes && description) {
+    try {
+      req.newAction = {
+        project_id: id,
+        description,
+        notes,
+        completed: completed || false,
+      };
+      next();
+    } catch (err) {
+      next(err);
+    }
+  } else {
+    res.status(400).json({
+      error: 'All actions require a description and notes.',
+    });
   }
 };
 
@@ -119,16 +150,28 @@ router
     }
   });
 
-router.get('/:id/actions', validateProjectId, async (req, res, next) => {
-  const { project } = req;
-  const { id } = project;
-  try {
-    const actions = await Projects.getProjectActions(id);
-    res.status(200).json(actions);
-  } catch (err) {
-    next(err);
-  }
-});
+router
+  .route('/:id/actions')
+  .all(validateProjectId)
+  .get(async (req, res, next) => {
+    const { project } = req;
+    const { id } = project;
+    try {
+      const actions = await Projects.getProjectActions(id);
+      res.status(200).json(actions);
+    } catch (err) {
+      next(err);
+    }
+  })
+  .post(validateAction, async (req, res, next) => {
+    try {
+      const { newAction } = req;
+      const action = await Actions.insert(newAction);
+      res.status(200).json(action);
+    } catch (err) {
+      next(err);
+    }
+  });
 
 const projectErrorHandler = (err, req, res, next) => {
   if (res.headersSent) {
